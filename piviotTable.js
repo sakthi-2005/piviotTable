@@ -3,6 +3,10 @@
  let data = [];
  let alt_header = [];
  let alt_data = [];
+ let display_header = [];
+ let display_data = [];
+ let agrr_arr = [];
+ let dateFieldMenu;
  
  document.getElementById("file_input").addEventListener('change',(event)=>{
 
@@ -21,28 +25,46 @@
             if(arr.length == len)return arr;
         }).filter((value)=>value != undefined); // shaping the csv data to matrix
 
-        header = data.shift(); 
+        display_header = data.shift();
+        
+
+        display_header.forEach(element => {
+            if(element.toLowerCase().indexOf('date') != -1){
+                header.push('DATE');
+                header.push('MONTH');
+                header.push('QUATER');
+                header.push('YEAR');
+                header.push('DAY');
+            }
+            else{
+                header.push(element);
+            }
+        });
+
+        display_data = [...data];
+
 
         determine_dataType(data); // changing the data to its preffered data type
 
         display_orginal[0].innerHTML = `<div>
                                             <input type='radio' name='select' value='row' class='select'>ROW
                                             <input type='radio' name='select' value='column' class='select'>COLUMN
-                                            <input type='radio' name='select' value='values' class='select'>VALUES <br/>
-                                            <button onclick='convert()'>create piviot Table </button>
+                                            <input type='radio' name='select' value='values' class='select'>VALUES 
+                                            <br/>
+                                            <button onclick='confirm()'>create piviot Table </button>
                                         </div>
                                         <br />
                                         <div class='table'> 
                                             <table>
                                                 <thead>
                                                     <tr>
-                                                        ${header.map((val)=>{
+                                                        ${display_header.map((val)=>{
                                                             return `<td onclick="select(this)">${val}</td>`
                                                         }).join('')}
                                                     </tr>
                                                 </thead>
                                                 <tbody>
-                                                    ${data.map(value=>{
+                                                    ${display_data.map(value=>{
                                                         return `<tr>
                                                             ${value.map(val=>{
                                                                 return `<td>${val}</td>`
@@ -53,6 +75,18 @@
                                                 </tbody>
                                             </table>
                                         </div>`
+
+
+        for(let i=0;i<data.length;i++){ //granulating the date field header and values
+            for(let j=0;j<header.length;j++){
+                if(header[j] == 'DATE'){
+                    let newDate = new Date(data[i][j])
+                    data[i].splice(1 , 0 , newDate.getMonth()+1 , Math.floor(newDate.getMonth() / 3) + 1 , newDate.getFullYear() , newDate.getDate());
+                    j += 4;
+                }
+            }
+        }
+
 
     }
 
@@ -88,13 +122,40 @@ let rowCatagory = new Set();
 let ColumnCatagory = new Set();
 let valueCatagory = new Set();
 
+
+
 function select(e){ // selection of row and column catagory
+
+    if(e.parentElement.tagName == 'TD'){
+        e.stopPropagation();
+    }
+
 
     let typeOfcatagory = document.querySelector('input[name="select"]:checked')
 
     if(!typeOfcatagory){
         alert('select row/column/values')
         return;
+    }
+
+    if(e.innerText.toLowerCase().indexOf('date') != -1){
+
+        if(!e.querySelector('#dateFieldMenu') && e.tagName === 'TD'){
+            e.innerHTML = ` <div id="dateFieldMenu" class="date-field-menu">
+                                <button class="date-option" onClick="select(this)" >DATE</button>
+                                <button class="date-option" onClick="select(this)" >YEAR</button>
+                                <button class="date-option" onClick="select(this)" >QUATER</button>
+                                <button class="date-option" onClick="select(this)" >MONTH</button>
+                                <button class="date-option" onClick="select(this)" >DAY</button>
+                            </div>
+                            ${e.innerText}`
+
+                            dateFieldMenu = document.getElementById('dateFieldMenu');
+        }
+    }
+
+    if(e.parentElement.tagName != 'TD' && dateFieldMenu){
+        dateFieldMenu.style.display = dateFieldMenu.style.display === 'block' ? 'none' : 'block';
     }
 
     if(rowCatagory.has(header.indexOf(e.innerText))){
@@ -108,25 +169,38 @@ function select(e){ // selection of row and column catagory
     }
 
 
-    if(e.classList.contains(`selected-${typeOfcatagory.value}`)){
+    if(e.innerText.toLowerCase().indexOf('date') != -1 && e.tagName == 'TD'){
+        // for preventing unnecessary colour change in date field
+    }
+    else if(e.classList.contains(`selected-${typeOfcatagory.value}`)){
         e.classList.remove(`selected-${typeOfcatagory.value}`)
     }
     else{
-        e.className = '';
+        [...e.classList].filter(c => c.startsWith('selected-')).forEach(c => e.classList.remove(c));
         e.classList.add(`selected-${typeOfcatagory.value}`)
-        if(typeOfcatagory.value == 'row'){
+        console.log(e.classList)
+
+        if(typeOfcatagory.value == 'row' && !e.innerText.includes('\n')){
             rowCatagory.add(header.indexOf(e.innerText));
         }
-        else if(typeOfcatagory.value == 'column'){
+        else if(typeOfcatagory.value == 'column' && !e.innerText.includes('\n')){
             ColumnCatagory.add(header.indexOf(e.innerText));
         }
-        else{
+        else if(typeOfcatagory.value == 'values' && !e.innerText.includes('\n')){
             valueCatagory.add(header.indexOf(e.innerText));
         }
     }
 }
 
+document.addEventListener('click',(e)=>{
+    console.log(e.target , dateFieldMenu)
+    if(dateFieldMenu && dateFieldMenu.style.display == 'block' && e.target != dateFieldMenu.parentElement && e.target.parentElement != dateFieldMenu){
+        dateFieldMenu.style.display = 'none';
+    }
+})
+
 function convert(){ 
+    console.log(rowCatagory,ColumnCatagory,valueCatagory,data)
 
     if((rowCatagory.size == 0 && ColumnCatagory.size == 0 ) || valueCatagory.size == 0){
         alert('atlest one value , row/column must be selected');
@@ -234,41 +308,33 @@ function filteringValues(row_arr,col_arr,row_arr_dumy,value_arr){
 
    unique_array = [];
    generateCombinations([...row_arr,...col_arr]).forEach(element => {
-        required_map.set(element.join('~'),[]);
+        required_map.set(element.join('~'),Array.from({ length: valueCatagory.size }, (_, i) => 0));
    })
 
-//    console.log(required_map)
+
 
    let indexes = [...rowCatagory,...ColumnCatagory];
 
-        for(let i=0;i<data.length;i++){
-            let group = [];
-            for(let j=0;j<indexes.length;j++){
-                group.push(data[i][indexes[j]])
-            }
 
+    for(let i=0;i<valueCatagory.size;i++){
+        let arr = aggrigate(data,indexes,required_map,i);
 
-            if(required_map.has(group.join('~'))){
-                let temp = required_map.get(group.join('~'))
-                
-                for(let j=0;j<valueCatagory.size;j++){
-                    if(temp.length < j){
-                        temp.push(data[i][[...valueCatagory][j]])
-                        continue;
-                    }
-                    // console.log(temp , group , header[[...valueCatagory][j]])
-                    // console.log(temp[j],typeof(temp[j]),'temp[j]', valueCatagory)
-                    // console.log(data[i][[...valueCatagory][j]],typeof(data[i][[...valueCatagory][j]]),'data[i][[...valueCatagory][j]]')
-                    temp[j] = (Number(temp[j]) || 0) + data[i][[...valueCatagory][j]]
-                }
-
-                required_map.set(group.join('~'),[...temp]);
-                // required_map.set(group.join('~'),Number(required_map.get(group.join('~')))+data[i][[...valueCatagory][0]])
-            }
-
+        if(arr == undefined){
+            alert(`wrong aggrigation function for catagory ${i+1}`)
         }
 
-        // console.log(...required_map.values())
+        for(let j=0;j<arr.length;j++){
+
+            if(required_map.has(arr[j][0])){
+
+                let val = required_map.get(arr[j][0]);
+                val[i] = arr[j][1]
+                required_map.set(arr[j][0],val);
+
+            }
+        }
+    }
+
 
    displayTable([...required_map.values()],row_arr,col_arr,value_arr);
 }
@@ -309,20 +375,17 @@ function displayTable(array,row,col,value_arr){
     }
     let row_data = rowdata(row);
 
-    console.log(row_data,row);
+    console.log(row_data,row,value_arr,data_array);
 
 
-    // console.log(array.length,array)
+    console.log((alt_header.length - rowCatagory.size ) * valueCatagory.size , alt_header.length , rowCatagory.size , valueCatagory.size)
 
+    let second_for_length = ColumnCatagory.size == 0 ? valueCatagory.size : ((alt_header.length - rowCatagory.size ) * valueCatagory.size );
     for(let i=0;i<data_array.length;i++){
         let count =0;
-        // console.log((alt_header.length - rowCatagory.size ) * valueCatagory.size) + rowCatagory.size
-        for(let j=0;j<((alt_header.length - rowCatagory.size ) * valueCatagory.size) + rowCatagory.size;){
-            // console.log(row_data,row,'from row ')
-            //
-            // console.log()
+        for(let j=0;j<second_for_length  + rowCatagory.size;){
+
             if(j < row.length){
-                // console.log('escaped here')
                 for(let k=0;k<row_data[i].length;k++){
                     data_array[i].push(row_data[i][k])
                     j++;
@@ -331,9 +394,9 @@ function displayTable(array,row,col,value_arr){
             }
             else{
                 let arr = array.shift();
-                // console.log(arr,'arr');
+
                 if(arr && arr.length != 0){
-                    // console.log('pushing value')
+
                     for(let a = 0;a<arr.length;a++){
                         data_array[i].push(arr[a])
                         j++;
@@ -342,7 +405,7 @@ function displayTable(array,row,col,value_arr){
                     
                 }
                 else{
-                    // console.log('pushing o')
+
                     for(let b of valueCatagory){
                         data_array[i].push(0)
                         j++
@@ -352,8 +415,7 @@ function displayTable(array,row,col,value_arr){
                 }
             }
         }
-        // console.log(count);
-        // console.log(alt_header.length)
+
     }
 
 
@@ -379,7 +441,7 @@ function displayTable(array,row,col,value_arr){
         matrix.map((val,ind)=>{
             console.log(val);
             return `<tr>
-                        ${ind == 0 ? for_row.map(val=>`<td rowspan=${Number(val.split('^row')[1])}>${val}</td>`).join('') : ''}
+                        ${ind == 0 ? for_row.map(val=>`<td rowspan=${Number(val.split('^row')[1])}>${val.split('^row')[0]}</td>`).join('') : ''}
                        ${val.map((value)=>{
                             if(value == 0){
                                 return;
@@ -436,6 +498,7 @@ function displayTable(array,row,col,value_arr){
 </div>`
 }
 
+
 function rowdata(matrix, row = 0, path = [], result = []) {
     // console.log('hi')
     if (row === matrix.length) {
@@ -477,13 +540,6 @@ function correct_table(header,body,value_arr){
     if(with_values.length == 0){
         with_values.push([...value_arr]);
     }
-    // with_values = [...with_values];
-
-    console.log(with_values,header)
-
-    // if(!with_values || with_values.length == 0){
-    //     return value_arr;
-    // }
 
     let len = with_values[0].length;
     for(let i=0;i<len;i++){ // for the first row(header) including value header
@@ -518,13 +574,6 @@ function correct_table(header,body,value_arr){
         with_values[0].unshift(`${row_head[row_head.length-i-1][0]}^row${ColumnCatagory.size + 1}`)
     }
     console.log(with_values)
-
-    // for(let i=1;i<with_values.length;i++){
-    //     for(let j=0;j<row_head.length;j++){
-    //         with_values[i].unshift(0);
-    //     }
-    // }
-    // console.log(body)
 
     len = row_head.length;
     for(let i=0;i<len;i++){
@@ -561,3 +610,196 @@ function correct_table(header,body,value_arr){
 
 }
 
+
+function aggrigate(data,indexes,required_map,i){
+
+    let type = agrr_arr[i];
+
+    switch(type){
+        case 'Sum':
+            return sum(data,required_map,indexes,i);
+        case 'Avg':
+            return avg(data,required_map,indexes,i);
+        case 'Count':
+            return count(data,required_map,indexes,i);
+        case 'CountDist':
+            return count_dist(data,required_map,indexes,i);
+        case 'Min':
+            return min();
+        case 'Max':
+            return max();
+    }
+}
+
+function confirm(){
+    let row = [];
+    let col = [];
+    let val = [];
+
+    for(let index of rowCatagory){
+        row.push(`<li>${header[index]}</li>`)
+    }
+
+    for(let index of ColumnCatagory){
+        col.push(`<li>${header[index]}</li>`)
+    }
+
+    for(let index of valueCatagory){
+        val.push(`<li>${header[index]}</li>                  
+                 <select>
+                    <option value="Sum">Sum</option>
+                    <option value="Avg">Avg</option>
+                    <option value="Count">Count</option>
+                    <option value="CountDist">Count Dist</option>
+                    <option value="Min">Min</option>
+                    <option value="Max">Max</option>
+                  </select>`);
+    }
+
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="confirmationScreen" class="confirmation-screen hidden">
+          <div class="confirmation-box">
+            <h2>Confirm Your Selection</h2>
+      
+            <div class="category">
+              <h3>ROW</h3>
+              <ul>${row.join('')}</ul>
+            </div>
+      
+            <div class="category">
+              <h3>COLUMN</h3>
+              <ul>${col.join('')}</ul>
+            </div>
+      
+            <div class="category">
+              <h3>Value</h3>
+              <ul>${val.join('')}</ul>
+            </div>
+      
+            <div class="actions">
+              <button id="backBtn">Back</button>
+              <button id="confirmBtn">Confirm</button>
+            </div>
+          </div>
+        </div>
+      `);
+      
+    const confirmationScreen = document.getElementById('confirmationScreen');
+    const backBtn = document.getElementById('backBtn');
+    const confirmBtn = document.getElementById('confirmBtn');
+
+
+    backBtn.addEventListener('click', () => {
+      confirmationScreen.classList.add('hidden');
+    });
+
+    if(confirmationScreen.classList.contains('hidden')){
+        confirmationScreen.classList.remove('hidden');
+    }
+
+    confirmBtn.addEventListener('click', () => {
+      const dropdownValues = Array.from(
+        document.querySelectorAll('#confirmationScreen select')
+      ).map(select => select.value);
+      agrr_arr = [...dropdownValues];
+      convert();
+      confirmationScreen.classList.add('hidden');
+    });
+}
+
+function sum(data,required_map,indexes,i){
+
+    let map = new Map();
+    for (let key of required_map.keys()) {
+        map.set(key, 0);
+    }
+
+    for(let j=0;j<data.length;j++){
+
+        if(typeof(data[j][[...valueCatagory][i]]) != 'Number'){
+            return;
+        }
+
+        let group = [];
+        for(let k=0;k<indexes.length;k++){
+            group.push(data[j][indexes[k]])
+        }
+
+        if(map.has(group.join('~'))){
+            let val = map.get(group.join('~'));
+            map.set(group.join('~'), val + data[j][[...valueCatagory][i]])
+        }
+    }
+
+    return [...map]
+}
+
+function count(data,required_map,indexes){
+
+    let map = new Map();
+    for (let key of required_map.keys()) {
+        map.set(key, 0);
+    }
+
+    for(let j=0;j<data.length;j++){
+
+
+        let group = [];
+        for(let k=0;k<indexes.length;k++){
+            group.push(data[j][indexes[k]])
+        }
+
+        if(map.has(group.join('~'))){
+            let val = map.get(group.join('~'));
+            map.set(group.join('~'), val + 1)
+        }
+    }
+
+    return [...map]
+}
+
+function avg(data,required_map,indexes,i){
+
+    let summ = sum(data,required_map,indexes,i);
+    let cnt = count(data,required_map,indexes,i);
+
+    let avg = [];
+
+    if(summ == undefined){
+        return;
+    }
+
+    for(let i=0;i<sum.length;i++){
+        avg.push(summ[i]/cnt[i]);
+    }
+
+    return avg
+}
+
+function count_dist(data,required_map,indexes,i){
+
+    let map = new Map();
+    for (let key of required_map.keys()) {
+        map.set(key, new Set());
+    }
+
+    for(let j=0;j<data.length;j++){
+
+        let group = [];
+        for(let k=0;k<indexes.length;k++){
+            group.push(data[j][indexes[k]])
+        }
+
+        if(map.has(group.join('~'))){
+            let val = map.get(group.join('~'));
+            val.add(data[j][[...valueCatagory][i]])
+            map.set(group.join('~'), val)
+        }
+    }
+
+    for (let [key, value] of map) {
+        map.set(key, value.size);
+    }
+
+    return [...map]
+}
